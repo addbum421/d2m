@@ -168,26 +168,57 @@ body {
   z-index: 10;
 }
 
-.header-left   { display: flex; align-items: center; gap: 10px; flex: 1; }
-.header-center { display: flex; gap: 8px; }
-.header-right  { display: flex; align-items: center; gap: 10px; flex: 1; justify-content: flex-end; }
+/* 헤더 영역 구분 */
+.header-meta    { display: flex; align-items: center; gap: 6px; flex: 1; min-width: 0; }
+.header-actions { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+.header-user    { display: flex; align-items: center; gap: 10px; flex-shrink: 0; margin-left: auto; }
 
 .logo { font-size: 1.3rem; font-weight: 700; letter-spacing: -0.5px; }
 
+/* 헤더 메타 인풋 (게임명 / 스테이지) */
+.meta-input {
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  color: var(--text-muted);
+  font-size: 13px;
+  padding: 4px 8px;
+  width: 120px;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+  outline: none;
+}
+.meta-input:hover {
+  border-color: var(--border);
+}
+.meta-input:focus {
+  border-color: var(--accent);
+  background: var(--surface2);
+  color: var(--text);
+}
+.meta-input::placeholder { color: var(--border); }
+
+.meta-sep {
+  color: var(--border);
+  font-size: 15px;
+  user-select: none;
+  flex-shrink: 0;
+}
+
+/* 헤더 맵 이름 인풋 */
 .map-name-input {
   background: transparent;
   border: 1px solid transparent;
   border-radius: 5px;
   color: var(--text);
   font-size: 14px;
-  padding: 5px 8px;
-  width: 200px;
-}
-.map-name-input:focus {
-  border-color: var(--border);
-  background: var(--surface2);
+  font-weight: 600;
+  padding: 4px 8px;
+  width: 180px;
   outline: none;
+  transition: border-color 0.15s, background 0.15s;
 }
+.map-name-input:hover  { border-color: var(--border); }
+.map-name-input:focus  { border-color: var(--accent); background: var(--surface2); }
 
 .btn-header {
   background: var(--surface2);

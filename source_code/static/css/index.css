@@ -183,30 +183,6 @@
 .empty-icon { font-size: 3rem; margin-bottom: 12px; }
 .empty-state p { margin-bottom: 20px; }
 
-/* ── 에디터 헤더 game/stage 인풋 ────────────── */
-.meta-input {
-  background: transparent;
-  border: 1px solid transparent;
-  border-radius: 5px;
-  color: var(--text-muted);
-  font-size: 13px;
-  padding: 4px 6px;
-  width: 110px;
-  transition: color 0.15s;
-}
-.meta-input:focus {
-  border-color: var(--border);
-  background: var(--surface2);
-  color: var(--text);
-  outline: none;
-}
-.meta-input::placeholder { color: var(--border); }
-.meta-sep {
-  color: var(--border);
-  font-size: 14px;
-  user-select: none;
-}
-
 /* ── 뷰어 전용 ───────────────────────────────── */
 .viewer-meta {
   display: flex;

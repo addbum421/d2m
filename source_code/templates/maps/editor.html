@@ -10,20 +10,23 @@
 
 <!-- ── 헤더 ─────────────────────────────────── -->
 <header class="header">
-  <div class="header-left">
-    <a href="{% url 'index' %}" class="logo" style="text-decoration:none">🗺</a>
+  <a href="{% url 'index' %}" class="logo" style="text-decoration:none" title="목록으로">🗺</a>
+
+  <div class="header-meta">
     <input id="map-game"  class="meta-input" placeholder="게임명" maxlength="50">
     <span class="meta-sep">/</span>
     <input id="map-stage" class="meta-input" placeholder="스테이지" maxlength="50">
     <span class="meta-sep">/</span>
     <input id="map-name"  class="map-name-input" value="새 맵" maxlength="50">
   </div>
-  <div class="header-center">
+
+  <div class="header-actions">
     <button id="btn-new"   class="btn-header" title="새 맵 (Ctrl+N)">＋ 새 맵</button>
     <button id="btn-save"  class="btn-header btn-save" title="저장 (Ctrl+S)">💾 저장</button>
     <button id="btn-load"  class="btn-header" title="불러오기">📂 불러오기</button>
   </div>
-  <div class="header-right">
+
+  <div class="header-user">
     <span class="user-info">👤 {{ user.username }}</span>
     <form method="post" action="{% url 'logout' %}" style="display:inline">
       {% csrf_token %}
