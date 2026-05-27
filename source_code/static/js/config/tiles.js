@@ -12,7 +12,7 @@ export const TILE_TYPES = {
   floor: {
     id: 0,
     label: '바닥',
-    color: '#EBF4F6',
+    color: '#d9e6e9',
     borderColor: '#B8CDD1',
     borderWidth: 1,
     cornerRadius: 0.15,
@@ -21,7 +21,7 @@ export const TILE_TYPES = {
   floor_mid: {
     id: 3,
     label: '단차 1',
-    color: '#B8D4DA',
+    color: '#abc2c7',
     borderColor: '#84AAAF',
     borderWidth: 1,
     cornerRadius: 0.15,
@@ -30,7 +30,7 @@ export const TILE_TYPES = {
   floor_low: {
     id: 4,
     label: '단차 2',
-    color: '#7DAAB5',
+    color: '#8ca4aa',
     borderColor: '#4E8290',
     borderWidth: 1,
     cornerRadius: 0.15,
