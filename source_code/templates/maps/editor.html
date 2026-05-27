@@ -156,7 +156,8 @@
       btn.style.background = t.color;
       btn.style.border = `2px solid ${t.borderColor}`;
       btn.dataset.tileId = t.id;
-      btn.textContent = t.label[0]; // 첫 글자
+      // label에 숫자가 포함된 경우(단차1, 단차2 등) 숫자 우선, 아니면 첫 글자
+      btn.textContent = t.label.match(/\d+$/)?.[0] ?? t.label[0];
       btn.onclick = () => {
         document.querySelectorAll('#tile-palette .palette-item').forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
