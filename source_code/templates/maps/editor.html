@@ -1,0 +1,437 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <title>D2M 에디터</title>
+  <link rel="stylesheet" href="{% static 'css/editor.css' %}">
+</head>
+<body class="editor-body">
+
+<!-- ── 헤더 ─────────────────────────────────── -->
+<header class="header">
+  <div class="header-left">
+    <span class="logo">🗺 D2M</span>
+    <input id="map-name" class="map-name-input" value="새 맵" maxlength="50">
+  </div>
+  <div class="header-center">
+    <button id="btn-new"   class="btn-header" title="새 맵 (Ctrl+N)">＋ 새 맵</button>
+    <button id="btn-save"  class="btn-header btn-save" title="저장 (Ctrl+S)">💾 저장</button>
+    <button id="btn-load"  class="btn-header" title="불러오기">📂 불러오기</button>
+  </div>
+  <div class="header-right">
+    <span class="user-info">👤 {{ user.username }}</span>
+    <form method="post" action="{% url 'logout' %}" style="display:inline">
+      {% csrf_token %}
+      <button type="submit" class="btn-logout">로그아웃</button>
+    </form>
+  </div>
+</header>
+
+<!-- ── 메인 레이아웃 ─────────────────────────── -->
+<div class="editor-layout">
+
+  <!-- 좌측 팔레트 패널 -->
+  <aside class="palette-panel" id="palette-panel">
+    <div class="panel-section">
+      <div class="panel-title">도구</div>
+      <div class="tool-grid" id="tool-btns">
+        <button class="tool-btn active" data-tool="brush"  title="브러시 (B)">🖌</button>
+        <button class="tool-btn"        data-tool="eraser" title="지우개 (E)">🧹</button>
+        <button class="tool-btn"        data-tool="fill"   title="채우기 (F)">🪣</button>
+        <button class="tool-btn"        data-tool="icon"   title="아이콘 (I)">📌</button>
+      </div>
+    </div>
+
+    <div class="panel-section">
+      <div class="panel-title">타일</div>
+      <div id="tile-palette" class="palette-grid"></div>
+    </div>
+
+    <div class="panel-section">
+      <div class="panel-title">아이콘</div>
+      <div id="icon-palette" class="palette-grid"></div>
+      <!-- 선택 중인 아이콘이 있을 때만 표시 -->
+      <div id="icon-selection-bar" class="icon-sel-bar hidden">
+        <span id="icon-sel-emoji"></span>
+        <input id="icon-label-input" class="icon-label-input"
+               type="text" placeholder="레이블…" maxlength="16">
+        <button id="btn-delete-icon" class="btn-icon-del" title="삭제 (Delete)">🗑</button>
+      </div>
+      <p class="hint-text">클릭: 선택 · Delete: 삭제</p>
+    </div>
+
+    <div class="panel-section layer-section">
+      <div class="panel-title">
+        <span>레이어</span>
+        <div class="layer-nav-btns">
+          <button id="btn-layer-up"   title="위 레이어 (↑)">▲</button>
+          <button id="btn-layer-down" title="아래 레이어 (↓)">▼</button>
+          <button id="btn-add-layer"  title="레이어 추가">＋</button>
+        </div>
+      </div>
+      <div id="layer-list"></div>
+    </div>
+  </aside>
+
+  <!-- 메인 캔버스 -->
+  <main class="canvas-wrap" id="canvas-wrap">
+    <canvas id="main-canvas"></canvas>
+  </main>
+
+</div>
+
+<!-- 맵 불러오기 모달 -->
+<div id="load-modal" class="modal hidden">
+  <div class="modal-box">
+    <h3>맵 불러오기</h3>
+    <div id="map-list-items"></div>
+    <button id="btn-modal-close" class="btn-sm">닫기</button>
+  </div>
+</div>
+
+<script type="module">
+  import { TILE_TYPES, TILE_PALETTE_ORDER } from "{% static 'js/config/tiles.js' %}";
+  import { ICON_TYPES, ICON_PALETTE_ORDER } from "{% static 'js/config/icons.js' %}";
+  import { Layers } from "{% static 'js/core/layers.js' %}";
+  import { Tools, TOOLS } from "{% static 'js/core/tools.js' %}";
+  import { CanvasRenderer } from "{% static 'js/core/canvas.js' %}";
+  import { API } from "{% static 'js/api.js' %}";
+
+  // ── 상태 ─────────────────────────────────────────
+  let renderer;
+  let currentMapId = null;
+  let mapWidth = 30, mapHeight = 20, tileSize = 32;
+  let autosaveTimer = null;
+
+  // ── 초기화 ───────────────────────────────────────
+  async function init() {
+    Layers.init(mapWidth, mapHeight);
+    Tools.init(mapWidth, mapHeight);
+
+    renderer = new CanvasRenderer(
+      document.getElementById('main-canvas'),
+      { width: mapWidth, height: mapHeight, tileSize }
+    );
+    renderer.onMapChange(() => {
+      scheduleAutosave();
+      syncIconSelectionBar();   // 아이콘 삭제 후 UI 갱신
+    });
+    renderer.resetView();
+
+    buildPalettes();
+    bindToolButtons();
+    bindHeaderButtons();
+    bindLayerPanel();
+    bindKeyboard();
+
+    // 마지막 맵 자동 복구
+    try {
+      const res = await API.getLastMap();
+      if (res.map) loadMapData(res.map);
+    } catch (e) { /* 첫 방문 */ }
+  }
+
+  // ── 팔레트 생성 ──────────────────────────────────
+  function buildPalettes() {
+    const tileEl = document.getElementById('tile-palette');
+    TILE_PALETTE_ORDER.forEach(key => {
+      const t = TILE_TYPES[key];
+      const btn = document.createElement('button');
+      btn.className = 'palette-item' + (t.id === 0 ? ' active' : '');
+      btn.title = t.label;
+      btn.style.background = t.color;
+      btn.style.border = `2px solid ${t.borderColor}`;
+      btn.dataset.tileId = t.id;
+      btn.textContent = t.label[0]; // 첫 글자
+      btn.onclick = () => {
+        document.querySelectorAll('#tile-palette .palette-item').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        Tools.setSelectedTile(t.id);
+        Tools.setCurrent(TOOLS.BRUSH);
+        syncToolUI();
+      };
+      tileEl.appendChild(btn);
+    });
+
+    const iconEl = document.getElementById('icon-palette');
+    ICON_PALETTE_ORDER.forEach(key => {
+      const ic = ICON_TYPES[key];
+      const btn = document.createElement('button');
+      btn.className = 'palette-item palette-icon';
+      btn.title = ic.label;
+      btn.textContent = ic.emoji;
+      btn.dataset.iconId = ic.id;
+      btn.onclick = () => {
+        document.querySelectorAll('#icon-palette .palette-item').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        Tools.setSelectedIcon(ic.id);
+        Tools.setCurrent(TOOLS.ICON);
+        syncToolUI();
+      };
+      iconEl.appendChild(btn);
+    });
+  }
+
+  // ── 도구 버튼 ────────────────────────────────────
+  function bindToolButtons() {
+    document.querySelectorAll('.tool-btn').forEach(btn => {
+      btn.onclick = () => {
+        Tools.setCurrent(btn.dataset.tool);
+        syncToolUI();
+      };
+    });
+  }
+
+  function syncToolUI() {
+    const cur = Tools.getCurrent();
+    document.querySelectorAll('.tool-btn').forEach(b => {
+      b.classList.toggle('active', b.dataset.tool === cur);
+    });
+  }
+
+  // ── 헤더 버튼 ────────────────────────────────────
+  function bindHeaderButtons() {
+    document.getElementById('btn-save').onclick = saveMap;
+    document.getElementById('btn-new').onclick = newMap;
+    document.getElementById('btn-load').onclick = openLoadModal;
+    document.getElementById('btn-modal-close').onclick = () =>
+      document.getElementById('load-modal').classList.add('hidden');
+  }
+
+  async function saveMap() {
+    const payload = buildPayload();
+    try {
+      const res = await API.saveMap(payload);
+      currentMapId = res.map.id;
+      showToast('저장 완료 ✓');
+    } catch(e) { showToast('저장 실패: ' + e.message, 'error'); }
+  }
+
+  function newMap() {
+    if (!confirm('현재 맵을 닫고 새 맵을 만들까요?')) return;
+    currentMapId = null;
+    Layers.init(mapWidth, mapHeight);
+    document.getElementById('map-name').value = '새 맵';
+    renderer.render();
+  }
+
+  async function openLoadModal() {
+    const modal = document.getElementById('load-modal');
+    const listEl = document.getElementById('map-list-items');
+    listEl.innerHTML = '불러오는 중...';
+    modal.classList.remove('hidden');
+    try {
+      const res = await API.listMaps();
+      if (!res.maps.length) { listEl.innerHTML = '저장된 맵이 없습니다.'; return; }
+      listEl.innerHTML = '';
+      res.maps.forEach(m => {
+        const item = document.createElement('div');
+        item.className = 'map-list-item';
+        item.innerHTML = `<span>${m.name}</span><small>${m.updated_at?.slice(0,16) ?? ''}</small>`;
+        item.onclick = async () => {
+          const r = await API.getMap(m.id);
+          loadMapData(r.map);
+          modal.classList.add('hidden');
+        };
+        listEl.appendChild(item);
+      });
+    } catch(e) { listEl.innerHTML = '불러오기 실패: ' + e.message; }
+  }
+
+  // ── 레이어 패널 ──────────────────────────────────
+  let _dragSrcIndex = null;   // 드래그 중인 레이어 인덱스
+
+  function bindLayerPanel() {
+    document.getElementById('btn-add-layer').onclick = () => {
+      Layers.add();
+      renderLayerList();
+      renderer.render();
+    };
+    document.getElementById('btn-layer-up').onclick = () => {
+      if (Layers.moveActiveUp()) { renderLayerList(); renderer.render(); }
+    };
+    document.getElementById('btn-layer-down').onclick = () => {
+      if (Layers.moveActiveDown()) { renderLayerList(); renderer.render(); }
+    };
+    renderLayerList();
+  }
+
+  function renderLayerList() {
+    const el = document.getElementById('layer-list');
+    el.innerHTML = '';
+
+    Layers.getAll().forEach((layer, i) => {
+      const row = document.createElement('div');
+      const isActive = i === Layers.getActiveIndex();
+      row.className = 'layer-row' + (isActive ? ' active' : '');
+      row.draggable = true;
+      row.dataset.index = i;
+
+      row.innerHTML = `
+        <span class="layer-drag-handle" title="드래그로 순서 변경">⠿</span>
+        <span class="layer-vis" title="가시성 토글">${layer.visible ? '👁' : '🚫'}</span>
+        <span class="layer-name">${layer.name}</span>
+        <button class="layer-del" title="삭제">✕</button>
+      `;
+
+      // 클릭 → active 변경
+      row.onclick = () => { Layers.setActiveIndex(i); renderLayerList(); };
+
+      // 가시성 토글
+      row.querySelector('.layer-vis').onclick = (e) => {
+        e.stopPropagation();
+        Layers.toggleVisible(i);
+        renderLayerList();
+        renderer.render();
+      };
+
+      // 삭제
+      row.querySelector('.layer-del').onclick = (e) => {
+        e.stopPropagation();
+        Layers.remove(i);
+        renderLayerList();
+        renderer.render();
+      };
+
+      // ── 드래그 이벤트 ──────────────────────────
+      row.addEventListener('dragstart', (e) => {
+        _dragSrcIndex = i;
+        row.classList.add('dragging');
+        e.dataTransfer.effectAllowed = 'move';
+      });
+
+      row.addEventListener('dragend', () => {
+        row.classList.remove('dragging');
+        el.querySelectorAll('.layer-row').forEach(r => r.classList.remove('drag-over'));
+      });
+
+      row.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+        // 기존 drag-over 클래스 제거 후 현재 위치에 표시
+        el.querySelectorAll('.layer-row').forEach(r => r.classList.remove('drag-over'));
+        if (_dragSrcIndex !== i) row.classList.add('drag-over');
+      });
+
+      row.addEventListener('drop', (e) => {
+        e.preventDefault();
+        if (_dragSrcIndex === null || _dragSrcIndex === i) return;
+        Layers.reorder(_dragSrcIndex, i);
+        _dragSrcIndex = null;
+        renderLayerList();
+        renderer.render();
+      });
+
+      el.appendChild(row);
+    });
+
+    // ▲▼ 버튼 비활성화 상태 갱신
+    const ai = Layers.getActiveIndex();
+    document.getElementById('btn-layer-up').disabled   = ai <= 0;
+    document.getElementById('btn-layer-down').disabled = ai >= Layers.getAll().length - 1;
+  }
+
+  // ── 자동저장 ─────────────────────────────────────
+  function scheduleAutosave() {
+    clearTimeout(autosaveTimer);
+    autosaveTimer = setTimeout(async () => {
+      try { await API.autosave(buildPayload()); } catch(e) {}
+    }, 3000); // 3초 후 자동저장
+  }
+
+  // ── 아이콘 선택 바 ───────────────────────────────
+  function syncIconSelectionBar() {
+    const bar       = document.getElementById('icon-selection-bar');
+    const emojiEl   = document.getElementById('icon-sel-emoji');
+    const inputEl   = document.getElementById('icon-label-input');
+    const sel       = renderer.getSelectedIcon();
+
+    if (sel) {
+      const layer = Layers.getAll()[sel.layerIndex];
+      const icon  = layer?.icons[sel.iconIndex];
+      const def   = icon ? ICON_TYPES[icon.type] : null;
+      emojiEl.textContent = def?.emoji ?? '';
+      // 포커스 중이 아닐 때만 값을 덮어씀 (타이핑 중 방해 방지)
+      if (document.activeElement !== inputEl) {
+        inputEl.value = icon?.label ?? '';
+      }
+      bar.classList.remove('hidden');
+    } else {
+      bar.classList.add('hidden');
+      inputEl.value = '';
+    }
+  }
+
+  // 레이블 입력 → 선택 아이콘에 즉시 반영
+  document.getElementById('icon-label-input').addEventListener('input', (e) => {
+    const sel = renderer.getSelectedIcon();
+    if (!sel) return;
+    const icon = Layers.getAll()[sel.layerIndex]?.icons[sel.iconIndex];
+    if (icon) {
+      icon.label = e.target.value.trim() || null;
+      renderer.render();
+    }
+  });
+
+  // canvas 클릭 후 선택 상태 동기화
+  document.getElementById('main-canvas').addEventListener('mousedown', () => {
+    setTimeout(syncIconSelectionBar, 0);
+  });
+
+  document.getElementById('btn-delete-icon').onclick = () => {
+    renderer.deleteSelectedIcon();
+    syncIconSelectionBar();
+  };
+
+  // ── 유틸 ─────────────────────────────────────────
+  function buildPayload() {
+    return {
+      id: currentMapId,
+      name: document.getElementById('map-name').value || '새 맵',
+      width: mapWidth, height: mapHeight, tile_size: tileSize,
+      data: { layers: Layers.toJSON() },
+    };
+  }
+
+  function loadMapData(mapData) {
+    currentMapId = mapData.id ?? null;
+    mapWidth  = mapData.width  ?? 30;
+    mapHeight = mapData.height ?? 20;
+    tileSize  = mapData.tile_size ?? 32;
+    document.getElementById('map-name').value = mapData.name ?? '새 맵';
+    Layers.init(mapWidth, mapHeight, mapData.data?.layers ?? null);
+    Tools.init(mapWidth, mapHeight);
+    renderer.mapWidth  = mapWidth;
+    renderer.mapHeight = mapHeight;
+    renderer.tileSize  = tileSize;
+    renderLayerList();
+    renderer.resetView();
+  }
+
+  function showToast(msg, type = 'ok') {
+    const t = document.createElement('div');
+    t.className = `toast toast-${type}`;
+    t.textContent = msg;
+    document.body.appendChild(t);
+    setTimeout(() => t.remove(), 2500);
+  }
+
+  function bindKeyboard() {
+    document.addEventListener('keydown', e => {
+      if (e.ctrlKey && e.key === 's') { e.preventDefault(); saveMap(); return; }
+      if (e.ctrlKey && e.key === 'n') { e.preventDefault(); newMap(); return; }
+      if (!e.ctrlKey) {
+        if (e.key === 'b') Tools.setCurrent(TOOLS.BRUSH);
+        if (e.key === 'e') Tools.setCurrent(TOOLS.ERASER);
+        if (e.key === 'f') Tools.setCurrent(TOOLS.FILL);
+        if (e.key === 'i') Tools.setCurrent(TOOLS.ICON);
+        syncToolUI();
+      }
+    });
+  }
+
+  init();
+</script>
+</body>
+</html>
