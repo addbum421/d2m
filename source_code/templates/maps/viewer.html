@@ -11,8 +11,9 @@
 
 <!-- ── 헤더 ─────────────────────────────────── -->
 <header class="header">
-  <div class="header-left">
-    <a href="{% url 'index' %}" class="logo" style="text-decoration:none">🗺 D2M</a>
+  <a href="{% url 'index' %}" class="logo" style="text-decoration:none" title="목록으로">🗺 D2M</a>
+
+  <div class="header-meta">
     <div class="viewer-meta">
       {% if map.game %}<span class="vmeta-game">{{ map.game }}</span>{% endif %}
       {% if map.game and map.stage %}<span class="vmeta-sep">/</span>{% endif %}
@@ -22,7 +23,8 @@
     </div>
     <span class="viewer-badge">열람 전용</span>
   </div>
-  <div class="header-right">
+
+  <div class="header-user">
     <span class="user-info">👤 {{ map.owner }}</span>
     {% if is_owner %}
       <a href="{% url 'editor' %}?map={{ map.id }}" class="btn-header btn-save">✏️ 편집</a>
