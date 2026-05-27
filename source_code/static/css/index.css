@@ -112,6 +112,109 @@
 }
 .filter-clear:hover { color: var(--danger); }
 
+/* ── 히어로 섹션 ────────────────────────────── */
+.hero {
+  padding: 72px 24px 56px;
+  text-align: center;
+  background: linear-gradient(180deg, var(--surface) 0%, var(--bg) 100%);
+  border-bottom: 1px solid var(--border);
+}
+
+.hero-inner {
+  max-width: 580px;
+  margin: 0 auto;
+}
+
+.hero-icon {
+  font-size: 3.2rem;
+  display: block;
+  margin-bottom: 16px;
+  line-height: 1;
+}
+
+.hero-title {
+  font-size: 2.4rem;
+  font-weight: 800;
+  letter-spacing: -1.5px;
+  color: var(--text);
+  margin-bottom: 14px;
+  line-height: 1.15;
+}
+.hero-sub {
+  color: var(--accent);
+  font-weight: 400;
+  letter-spacing: -0.5px;
+}
+
+.hero-desc {
+  font-size: 15px;
+  color: var(--text-muted);
+  line-height: 1.75;
+  margin-bottom: 32px;
+}
+
+/* CTA 버튼 */
+.hero-cta {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  margin-bottom: 36px;
+  flex-wrap: wrap;
+}
+
+.cta-btn {
+  padding: 11px 28px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  text-decoration: none;
+  display: inline-block;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.cta-primary {
+  background: var(--accent);
+  color: var(--bg);
+  border: 1px solid var(--accent);
+}
+.cta-primary:hover { background: var(--accent-hover); border-color: var(--accent-hover); }
+
+.cta-ghost {
+  background: transparent;
+  color: var(--accent);
+  border: 1px solid var(--accent);
+}
+.cta-ghost:hover { background: var(--accent-muted); }
+
+/* 기능 뱃지 */
+.hero-features {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.feat-chip {
+  font-size: 12px;
+  color: var(--text-muted);
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 4px 14px;
+}
+
+/* 섹션 레이블 */
+.section-label {
+  padding: 20px 24px 4px;
+  max-width: 1200px;
+  margin: 0 auto;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+}
+
 /* ── 맵 그리드 ───────────────────────────────── */
 .index-main {
   padding: 28px 24px;
