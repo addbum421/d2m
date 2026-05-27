@@ -387,9 +387,19 @@
     }
   });
 
-  // canvas 클릭 후 선택 상태 동기화
+  // canvas mousedown → 즉시 선택 바 동기화 (선택 해제 포함)
   document.getElementById('main-canvas').addEventListener('mousedown', () => {
     setTimeout(syncIconSelectionBar, 0);
+  });
+
+  // canvas mouseup → 드래그 아닌 클릭으로 아이콘 선택 시 레이블 인풋 포커스
+  document.getElementById('main-canvas').addEventListener('mouseup', () => {
+    setTimeout(() => {
+      syncIconSelectionBar();
+      if (renderer.getSelectedIcon() && !renderer.wasLastDrag()) {
+        document.getElementById('icon-label-input').focus();
+      }
+    }, 0);
   });
 
   document.getElementById('btn-delete-icon').onclick = () => {

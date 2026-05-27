@@ -60,6 +60,12 @@ export class CanvasRenderer {
     // { layerIndex: number, iconIndex: number } | null
     this._selectedIcon = null;
 
+    // 아이콘 드래그 이동 상태
+    this._draggingIcon    = null;   // { layerIndex, iconIndex }
+    this._dragMoved       = false;  // 임계값 초과 여부
+    this._dragStartClient = { x: 0, y: 0 };
+    this._lastWasDrag     = false;  // mouseup 후 외부에서 쿼리용
+
     this._onChangeCallback = null;
 
     this._bindEvents();
@@ -73,6 +79,9 @@ export class CanvasRenderer {
 
   // ── 선택 아이콘 외부 접근 ─────────────────────────
   getSelectedIcon() { return this._selectedIcon; }
+
+  /** 마지막 마우스업이 드래그였는지 (레이블 포커스 판단용) */
+  wasLastDrag() { return this._lastWasDrag; }
 
   clearSelection() {
     this._selectedIcon = null;
@@ -333,25 +342,22 @@ export class CanvasRenderer {
     const mapPos  = this._canvasToMapFloat(e.clientX, e.clientY);
     const tilePos = this._canvasToTile(e.clientX, e.clientY);
 
-    // ① 아이콘 클릭 감지 (도구 무관하게 항상 체크)
+    // ① 아이콘 히트 감지 (도구 무관)
     const hit = Layers.findIconAt(mapPos.x, mapPos.y);
     if (hit) {
-      // 같은 아이콘 재클릭 → 선택 해제
-      if (
-        this._selectedIcon &&
-        this._selectedIcon.layerIndex === hit.layerIndex &&
-        this._selectedIcon.iconIndex  === hit.iconIndex
-      ) {
-        this._selectedIcon = null;
-      } else {
-        this._selectedIcon = { layerIndex: hit.layerIndex, iconIndex: hit.iconIndex };
-      }
+      // 선택 + 드래그 추적 시작
+      this._selectedIcon    = { layerIndex: hit.layerIndex, iconIndex: hit.iconIndex };
+      this._draggingIcon    = { layerIndex: hit.layerIndex, iconIndex: hit.iconIndex };
+      this._dragMoved       = false;
+      this._dragStartClient = { x: e.clientX, y: e.clientY };
+      this._lastWasDrag     = false;
       this.render();
       return;
     }
 
     // ② 빈 공간 클릭 → 선택 해제
     this._selectedIcon = null;
+    this._draggingIcon = null;
 
     // ③ ICON 도구: float 좌표에 아이콘 배치
     if (Tools.getCurrent() === TOOLS.ICON) {
@@ -367,6 +373,26 @@ export class CanvasRenderer {
   }
 
   _onMouseMove(e) {
+    // 아이콘 드래그 이동 (패닝·페인팅보다 우선)
+    if (this._draggingIcon) {
+      const dx = e.clientX - this._dragStartClient.x;
+      const dy = e.clientY - this._dragStartClient.y;
+      if (!this._dragMoved && Math.hypot(dx, dy) > 5) {
+        this._dragMoved = true;
+      }
+      if (this._dragMoved) {
+        const mp = this._canvasToMapFloat(e.clientX, e.clientY);
+        const { layerIndex, iconIndex } = this._draggingIcon;
+        const icon = Layers.getAll()[layerIndex]?.icons[iconIndex];
+        if (icon) {
+          icon.x = Math.max(0, Math.min(mp.x, this.mapWidth));
+          icon.y = Math.max(0, Math.min(mp.y, this.mapHeight));
+          this.render();
+        }
+      }
+      return;
+    }
+
     if (this._isPanning) {
       this.offsetX += e.clientX - this._lastPanX;
       this.offsetY += e.clientY - this._lastPanY;
@@ -380,6 +406,14 @@ export class CanvasRenderer {
   }
 
   _onMouseUp() {
+    if (this._draggingIcon) {
+      this._lastWasDrag = this._dragMoved;
+      // 실제로 이동이 발생했을 때만 자동저장 트리거
+      if (this._dragMoved && this._onChangeCallback) this._onChangeCallback();
+      this._draggingIcon = null;
+      this._dragMoved    = false;
+      return;
+    }
     this._isPainting = false;
     this._isPanning  = false;
   }
