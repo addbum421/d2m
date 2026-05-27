@@ -1,0 +1,82 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>D2M — Draw to Map</title>
+  <link rel="stylesheet" href="{% static 'css/editor.css' %}">
+  <link rel="stylesheet" href="{% static 'css/index.css' %}">
+</head>
+<body class="index-body">
+
+<!-- ── 헤더 ─────────────────────────────────── -->
+<header class="index-header">
+  <a href="{% url 'index' %}" class="index-logo">🗺 D2M</a>
+
+  <form class="search-form" method="get" action="{% url 'index' %}">
+    <input class="search-input" type="text" name="q"
+           placeholder="게임명, 스테이지, 맵 이름 검색…"
+           value="{{ q }}" autocomplete="off">
+    <button class="search-btn" type="submit">🔍</button>
+  </form>
+
+  <nav class="index-nav">
+    {% if user.is_authenticated %}
+      <a href="{% url 'editor' %}" class="nav-btn nav-btn-accent">✏️ 편집기</a>
+      <span class="nav-user">{{ user.username }}</span>
+      <form method="post" action="{% url 'logout' %}" style="display:inline">
+        {% csrf_token %}
+        <button type="submit" class="nav-btn">로그아웃</button>
+      </form>
+    {% else %}
+      <a href="{% url 'login' %}" class="nav-btn">로그인</a>
+      <a href="{% url 'register' %}" class="nav-btn nav-btn-accent">회원가입</a>
+    {% endif %}
+  </nav>
+</header>
+
+<!-- ── 필터 태그 ──────────────────────────────── -->
+{% if filter_game or filter_stage or q %}
+<div class="filter-bar">
+  <span class="filter-label">필터:</span>
+  {% if q %}<span class="filter-tag">🔍 {{ q }}</span>{% endif %}
+  {% if filter_game %}<span class="filter-tag">🎮 {{ filter_game }}</span>{% endif %}
+  {% if filter_stage %}<span class="filter-tag">🗺 {{ filter_stage }}</span>{% endif %}
+  <a href="{% url 'index' %}" class="filter-clear">✕ 초기화</a>
+</div>
+{% endif %}
+
+<!-- ── 맵 그리드 ──────────────────────────────── -->
+<main class="index-main">
+  {% if maps %}
+    <div class="map-grid">
+      {% for m in maps %}
+      <a href="/view/{{ m.id }}/" class="map-card">
+        <div class="card-breadcrumb">
+          {% if m.game %}<span class="crumb-game">{{ m.game }}</span>{% endif %}
+          {% if m.game and m.stage %}<span class="crumb-sep">/</span>{% endif %}
+          {% if m.stage %}<span class="crumb-stage">{{ m.stage }}</span>{% endif %}
+          {% if not m.game and not m.stage %}<span class="crumb-none">—</span>{% endif %}
+        </div>
+        <div class="card-title">{{ m.name }}</div>
+        <div class="card-footer">
+          <span class="card-author">👤 {{ m.owner }}</span>
+          <span class="card-size">{{ m.width }}×{{ m.height }}</span>
+        </div>
+      </a>
+      {% endfor %}
+    </div>
+  {% else %}
+    <div class="empty-state">
+      <div class="empty-icon">🗺</div>
+      <p>{% if q or filter_game or filter_stage %}검색 결과가 없습니다.{% else %}아직 저장된 맵이 없습니다.{% endif %}</p>
+      {% if user.is_authenticated %}
+        <a href="{% url 'editor' %}" class="nav-btn nav-btn-accent">첫 맵 만들기</a>
+      {% endif %}
+    </div>
+  {% endif %}
+</main>
+
+</body>
+</html>

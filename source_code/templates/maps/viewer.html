@@ -1,0 +1,93 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <title>{{ map.game|default:"" }}{% if map.game and map.stage %} / {% endif %}{{ map.stage|default:"" }} — {{ map.name }} | D2M</title>
+  <link rel="stylesheet" href="{% static 'css/editor.css' %}">
+  <link rel="stylesheet" href="{% static 'css/index.css' %}">
+</head>
+<body class="editor-body">
+
+<!-- ── 헤더 ─────────────────────────────────── -->
+<header class="header">
+  <div class="header-left">
+    <a href="{% url 'index' %}" class="logo" style="text-decoration:none">🗺 D2M</a>
+    <div class="viewer-meta">
+      {% if map.game %}<span class="vmeta-game">{{ map.game }}</span>{% endif %}
+      {% if map.game and map.stage %}<span class="vmeta-sep">/</span>{% endif %}
+      {% if map.stage %}<span class="vmeta-stage">{{ map.stage }}</span>{% endif %}
+      {% if map.game or map.stage %}<span class="vmeta-sep">/</span>{% endif %}
+      <span class="vmeta-name">{{ map.name }}</span>
+    </div>
+    <span class="viewer-badge">열람 전용</span>
+  </div>
+  <div class="header-right">
+    <span class="user-info">👤 {{ map.owner }}</span>
+    {% if is_owner %}
+      <a href="{% url 'editor' %}?map={{ map.id }}" class="btn-header btn-save">✏️ 편집</a>
+    {% elif can_copy %}
+      <button id="btn-copy" class="btn-header btn-save">📋 복사해서 편집</button>
+    {% else %}
+      <a href="{% url 'login' %}?next=/view/{{ map.id }}/" class="btn-header">로그인 후 복사</a>
+    {% endif %}
+    <a href="{% url 'index' %}" class="btn-logout" style="text-decoration:none">← 목록</a>
+  </div>
+</header>
+
+<!-- ── 캔버스 (read-only) ──────────────────────── -->
+<div class="editor-layout">
+  <main class="canvas-wrap" id="canvas-wrap" style="cursor:default">
+    <canvas id="main-canvas"></canvas>
+  </main>
+</div>
+
+<script type="module">
+  import { TILE_BY_ID } from "{% static 'js/config/tiles.js' %}";
+  import { ICON_TYPES }  from "{% static 'js/config/icons.js' %}";
+  import { Layers }      from "{% static 'js/core/layers.js' %}";
+  import { CanvasRenderer } from "{% static 'js/core/canvas.js' %}";
+  import { Tools }       from "{% static 'js/core/tools.js' %}";
+
+  const mapData = {{ map_json|safe }};
+
+  const renderer = new CanvasRenderer(
+    document.getElementById('main-canvas'),
+    { width: mapData.width, height: mapData.height, tileSize: mapData.tile_size }
+  );
+
+  // read-only: 마우스 이벤트 비활성화
+  renderer._bindEvents = () => {
+    document.getElementById('main-canvas').addEventListener('wheel', e => {
+      e.preventDefault();
+      const factor = e.deltaY < 0 ? 1.1 : 0.9;
+      const rect = renderer.canvas.getBoundingClientRect();
+      const mx = e.clientX - rect.left, my = e.clientY - rect.top;
+      renderer.offsetX = mx - (mx - renderer.offsetX) * factor;
+      renderer.offsetY = my - (my - renderer.offsetY) * factor;
+      renderer.scale = Math.max(0.2, Math.min(renderer.scale * factor, 8));
+      renderer.render();
+    }, { passive: false });
+  };
+
+  Layers.init(mapData.width, mapData.height, mapData.data?.layers ?? null);
+  Tools.init(mapData.width, mapData.height);
+  renderer.resetView();
+
+  {% if can_copy and not is_owner %}
+  document.getElementById('btn-copy')?.addEventListener('click', async () => {
+    const res = await fetch(`/api/maps/{{ map.id }}/copy/`, {
+      method: 'POST',
+      headers: {
+        'X-CSRFToken': document.cookie.match(/csrftoken=([^;]+)/)?.[1] ?? ''
+      }
+    });
+    const data = await res.json();
+    if (data.ok) {
+      window.location.href = `/editor/?map=${data.map.id}`;
+    }
+  });
+  {% endif %}
+</script>
+</body>
+</html>

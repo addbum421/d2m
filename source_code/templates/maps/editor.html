@@ -11,8 +11,12 @@
 <!-- ── 헤더 ─────────────────────────────────── -->
 <header class="header">
   <div class="header-left">
-    <span class="logo">🗺 D2M</span>
-    <input id="map-name" class="map-name-input" value="새 맵" maxlength="50">
+    <a href="{% url 'index' %}" class="logo" style="text-decoration:none">🗺</a>
+    <input id="map-game"  class="meta-input" placeholder="게임명" maxlength="50">
+    <span class="meta-sep">/</span>
+    <input id="map-stage" class="meta-input" placeholder="스테이지" maxlength="50">
+    <span class="meta-sep">/</span>
+    <input id="map-name"  class="map-name-input" value="새 맵" maxlength="50">
   </div>
   <div class="header-center">
     <button id="btn-new"   class="btn-header" title="새 맵 (Ctrl+N)">＋ 새 맵</button>
@@ -125,11 +129,17 @@
     bindLayerPanel();
     bindKeyboard();
 
-    // 마지막 맵 자동 복구
+    // URL ?map=<id> 우선 복구, 없으면 마지막 맵
+    const urlMapId = new URLSearchParams(window.location.search).get('map');
     try {
-      const res = await API.getLastMap();
-      if (res.map) loadMapData(res.map);
-    } catch (e) { /* 첫 방문 */ }
+      if (urlMapId) {
+        const res = await API.getMap(Number(urlMapId));
+        if (res.map) loadMapData(res.map);
+      } else {
+        const res = await API.getLastMap();
+        if (res.map) loadMapData(res.map);
+      }
+    } catch (e) { /* 첫 방문 또는 맵 없음 */ }
   }
 
   // ── 팔레트 생성 ──────────────────────────────────
@@ -387,8 +397,10 @@
   // ── 유틸 ─────────────────────────────────────────
   function buildPayload() {
     return {
-      id: currentMapId,
-      name: document.getElementById('map-name').value || '새 맵',
+      id:    currentMapId,
+      name:  document.getElementById('map-name').value  || '새 맵',
+      game:  document.getElementById('map-game').value  || '',
+      stage: document.getElementById('map-stage').value || '',
       width: mapWidth, height: mapHeight, tile_size: tileSize,
       data: { layers: Layers.toJSON() },
     };
@@ -399,7 +411,9 @@
     mapWidth  = mapData.width  ?? 30;
     mapHeight = mapData.height ?? 20;
     tileSize  = mapData.tile_size ?? 32;
-    document.getElementById('map-name').value = mapData.name ?? '새 맵';
+    document.getElementById('map-name').value  = mapData.name  ?? '새 맵';
+    document.getElementById('map-game').value  = mapData.game  ?? '';
+    document.getElementById('map-stage').value = mapData.stage ?? '';
     Layers.init(mapWidth, mapHeight, mapData.data?.layers ?? null);
     Tools.init(mapWidth, mapHeight);
     renderer.mapWidth  = mapWidth;

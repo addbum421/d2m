@@ -303,9 +303,13 @@ export class CanvasRenderer {
     c.addEventListener('wheel',       e => this._onWheel(e), { passive: false });
     c.addEventListener('contextmenu', e => e.preventDefault());
 
-    // Delete/Backspace → 선택 아이콘 삭제
+    // Delete → 선택 아이콘 삭제 (Backspace 제외: 레이블 인풋 타이핑 방해)
     window.addEventListener('keydown', e => {
-      if (e.key === 'Delete' || e.key === 'Backspace') {
+      // 인풋/텍스트영역 포커스 중이면 단축키 무시
+      const tag = document.activeElement?.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+
+      if (e.key === 'Delete') {
         if (this._selectedIcon) {
           e.preventDefault();
           this.deleteSelectedIcon();
