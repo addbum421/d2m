@@ -140,25 +140,83 @@ export class CanvasRenderer {
         const px = x * tileSize;
         const py = y * tileSize;
 
-        // 면(fill)
         let color = tileDef.color;
         if (isAutotile(tileId)) {
           const mask = getBitmask(tiles, x, y, mapWidth, mapHeight, tileId);
           color = getWallColor(mask);
         }
-        ctx.fillStyle = color;
-        ctx.fillRect(px, py, tileSize, tileSize);
 
-        // 공유 테두리 — 이웃이 같은 타입이면 그 방향 선 생략
+        // 볼록 코너 라운드 계산
+        const r = (tileDef.cornerRadius ?? 0) * tileSize;
+        const radii = r > 0
+          ? this._getCornerRadii(tiles, x, y, tileId, r)
+          : { tl: 0, tr: 0, br: 0, bl: 0 };
+        const hasRound = radii.tl || radii.tr || radii.br || radii.bl;
+
+        ctx.save();
+
+        // 면(fill) — 라운드 있으면 rounded path, 없으면 fillRect
+        if (hasRound) {
+          this._buildRoundedPath(ctx, px, py, tileSize, tileSize, radii);
+          ctx.fillStyle = color;
+          ctx.fill();
+        } else {
+          ctx.fillStyle = color;
+          ctx.fillRect(px, py, tileSize, tileSize);
+        }
+
+        // 공유 테두리 — 라운드 있으면 clip 후 선 그리기 (코너 자동 처리)
         if (tileDef.borderColor) {
+          if (hasRound) {
+            this._buildRoundedPath(ctx, px, py, tileSize, tileSize, radii);
+            ctx.clip();
+          }
           this._drawSharedBorder(
             ctx, tiles, x, y, tileId, px, py,
             tileDef.borderColor,
             tileDef.borderWidth ?? 1,
           );
         }
+
+        ctx.restore();
       }
     }
+  }
+
+  /**
+   * 각 모서리의 라운드 반지름 계산.
+   * 볼록 코너(해당 방향 2개 이웃이 모두 다른 타입)에만 r 적용.
+   */
+  _getCornerRadii(tiles, x, y, tileId, r) {
+    const { mapWidth, mapHeight } = this;
+    const same = (nx, ny) => {
+      if (nx < 0 || nx >= mapWidth || ny < 0 || ny >= mapHeight) return false;
+      return tiles[ny * mapWidth + nx] === tileId;
+    };
+    return {
+      tl: (!same(x - 1, y) && !same(x, y - 1)) ? r : 0,
+      tr: (!same(x + 1, y) && !same(x, y - 1)) ? r : 0,
+      br: (!same(x + 1, y) && !same(x, y + 1)) ? r : 0,
+      bl: (!same(x - 1, y) && !same(x, y + 1)) ? r : 0,
+    };
+  }
+
+  /**
+   * 모서리별 반지름을 가진 둥근 사각형 path 생성 (fill/clip 공용).
+   * radii: { tl, tr, br, bl } — 각 코너 반지름 (0 = 직각)
+   */
+  _buildRoundedPath(ctx, x, y, w, h, { tl, tr, br, bl }) {
+    ctx.beginPath();
+    ctx.moveTo(x + tl, y);
+    ctx.lineTo(x + w - tr, y);
+    tr > 0 ? ctx.arcTo(x + w, y,     x + w, y + tr,     tr) : ctx.lineTo(x + w, y);
+    ctx.lineTo(x + w, y + h - br);
+    br > 0 ? ctx.arcTo(x + w, y + h, x + w - br, y + h, br) : ctx.lineTo(x + w, y + h);
+    ctx.lineTo(x + bl, y + h);
+    bl > 0 ? ctx.arcTo(x,     y + h, x,     y + h - bl, bl) : ctx.lineTo(x, y + h);
+    ctx.lineTo(x, y + tl);
+    tl > 0 ? ctx.arcTo(x,     y,     x + tl, y,         tl) : ctx.lineTo(x, y);
+    ctx.closePath();
   }
 
   /**

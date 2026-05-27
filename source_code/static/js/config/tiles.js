@@ -5,12 +5,15 @@
 
 export const TILE_TYPES = {
   // id: 정수 (null = 빈칸/투명)
+  // cornerRadius: 0.0~0.5 — tileSize 대비 비율 (0 = 직각, 0.3 = 완만한 라운드)
+  //   볼록 코너(이웃 없는 방향)에만 적용, 오목 코너는 항상 직각 유지
   floor: {
     id: 0,
     label: '바닥',
     color: '#8B7355',
     borderColor: '#6B5335',
-    borderWidth: 1,          // 테두리 두께 (px)
+    borderWidth: 1,
+    cornerRadius: 0.15,
     autotile: false,
   },
   wall: {
@@ -19,6 +22,7 @@ export const TILE_TYPES = {
     color: '#4A4A5A',
     borderColor: '#2A2A3A',
     borderWidth: 3,
+    cornerRadius: 0.3,
     autotile: true,
   },
   void: {
@@ -27,6 +31,7 @@ export const TILE_TYPES = {
     color: '#0D0D1A',
     borderColor: '#050508',
     borderWidth: 3,
+    cornerRadius: 0,
     autotile: false,
   },
 };
